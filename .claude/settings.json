@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "additionalDirectories": ["../wizard-app-planning"],
+    "allow": [
+      "Read(../wizard-app-planning/**)",
+      "Bash(gh issue view:*)",
+      "Bash(gh issue list:*)",
+      "Bash(gh api user:*)",
+      "Bash(git status:*)",
+      "Bash(git log:*)",
+      "Bash(git branch:*)",
+      "Bash(git diff:*)"
+    ]
+  }
+}
