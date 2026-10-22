@@ -1,0 +1,2 @@
+-- 로컬 테스트 데이터 (npx supabase db reset 때 실행)
+-- 아직 비어 있음
