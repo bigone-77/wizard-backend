@@ -1,0 +1,101 @@
+-- =====================================================================
+-- SQL 테스트 공통 도우미
+-- 사용: 테스트 파일에서 begin; 다음 줄에 \ir _helpers.psql
+-- 테스트 트랜잭션 안에서 만들어지므로 rollback과 함께 사라짐 (DB에 남지 않음)
+-- 확장자가 .psql이라 pg_prove가 테스트로 실행하지 않음
+-- =====================================================================
+create extension if not exists pgtap with schema extensions;
+create schema if not exists tests;
+
+-- 테스트 사용자 생성 (프로필은 on_auth_user_created 트리거가 만듦)
+create or replace function tests.create_user(p_identifier text)
+returns uuid
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_id uuid := gen_random_uuid();
+begin
+  insert into auth.users (id, email, aud, role)
+  values (v_id, p_identifier || '@test.local', 'authenticated', 'authenticated');
+  return v_id;
+end;
+$$;
+
+create or replace function tests.get_user_id(p_identifier text)
+returns uuid
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  v_id uuid;
+begin
+  select id into v_id from auth.users where email = p_identifier || '@test.local';
+  if v_id is null then
+    raise exception 'test user "%" not found (tests.create_user 먼저)', p_identifier;
+  end if;
+  return v_id;
+end;
+$$;
+
+-- 역할 전환은 security definer 함수 안에서 할 수 없으므로 아래 셋은 invoker
+-- 정식 사용자로 로그인한 상태
+create or replace function tests.authenticate_as(p_identifier text)
+returns void
+language plpgsql
+as $$
+begin
+  perform set_config('role', 'authenticated', true);
+  perform set_config('request.jwt.claims', json_build_object(
+    'sub', tests.get_user_id(p_identifier),
+    'role', 'authenticated',
+    'email', p_identifier || '@test.local'
+  )::text, true);
+end;
+$$;
+
+-- 서버 함수 권한
+create or replace function tests.authenticate_as_service_role()
+returns void
+language plpgsql
+as $$
+begin
+  perform set_config('role', 'service_role', true);
+  perform set_config('request.jwt.claims', '{"role":"service_role"}', true);
+end;
+$$;
+
+-- 로그아웃 상태 (세션 없이 anon key만)
+create or replace function tests.clear_authentication()
+returns void
+language plpgsql
+as $$
+begin
+  perform set_config('role', 'anon', true);
+  perform set_config('request.jwt.claims', '{"role":"anon"}', true);
+end;
+$$;
+
+-- 테스트용 개체 (나이·분양일 필수값을 채워서)
+create or replace function tests.create_pet(p_owner text, p_name text default '테스트')
+returns uuid
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_id uuid;
+begin
+  insert into public.pets (user_id, species_id, name, size_stage, adopted_at)
+  values (tests.get_user_id(p_owner), 'fat_tailed_gecko', p_name, 'adult', current_date - 30)
+  returning id into v_id;
+  return v_id;
+end;
+$$;
+
+-- 역할을 바꾼 뒤에도 도우미를 부를 수 있게
+grant usage on schema tests to anon, authenticated, service_role;
+grant execute on all functions in schema tests to anon, authenticated, service_role;
