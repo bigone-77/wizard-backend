@@ -1,0 +1,209 @@
+-- =====================================================================
+-- SQL 테스트 공통 도우미
+-- 사용: 테스트 파일에서 begin; 다음 줄에 \ir _helpers.psql
+-- 테스트 트랜잭션 안에서 만들어지므로 rollback과 함께 사라짐 (DB에 남지 않음)
+-- 확장자가 .psql이라 pg_prove가 테스트로 실행하지 않음
+-- =====================================================================
+create extension if not exists pgtap with schema extensions;
+create schema if not exists tests;
+
+-- 테스트 사용자 생성 (프로필은 on_auth_user_created 트리거가 만듦)
+create or replace function tests.create_user(p_identifier text)
+returns uuid
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_id uuid := gen_random_uuid();
+begin
+  insert into auth.users (id, email, aud, role)
+  values (v_id, p_identifier || '@test.local', 'authenticated', 'authenticated');
+  return v_id;
+end;
+$$;
+
+create or replace function tests.get_user_id(p_identifier text)
+returns uuid
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  v_id uuid;
+begin
+  select id into v_id from auth.users where email = p_identifier || '@test.local';
+  if v_id is null then
+    raise exception 'test user "%" not found (tests.create_user 먼저)', p_identifier;
+  end if;
+  return v_id;
+end;
+$$;
+
+-- 역할 전환은 security definer 함수 안에서 할 수 없으므로 아래 셋은 invoker
+-- 정식 사용자로 로그인한 상태
+create or replace function tests.authenticate_as(p_identifier text)
+returns void
+language plpgsql
+as $$
+begin
+  perform set_config('role', 'authenticated', true);
+  perform set_config('request.jwt.claims', json_build_object(
+    'sub', tests.get_user_id(p_identifier),
+    'role', 'authenticated',
+    'email', p_identifier || '@test.local'
+  )::text, true);
+end;
+$$;
+
+-- 서버 함수 권한
+create or replace function tests.authenticate_as_service_role()
+returns void
+language plpgsql
+as $$
+begin
+  perform set_config('role', 'service_role', true);
+  perform set_config('request.jwt.claims', '{"role":"service_role"}', true);
+end;
+$$;
+
+-- 로그아웃 상태 (세션 없이 anon key만)
+create or replace function tests.clear_authentication()
+returns void
+language plpgsql
+as $$
+begin
+  perform set_config('role', 'anon', true);
+  perform set_config('request.jwt.claims', '{"role":"anon"}', true);
+end;
+$$;
+
+-- 테스트용 개체 (나이·분양일 필수값을 채워서)
+create or replace function tests.create_pet(p_owner text, p_name text default '테스트')
+returns uuid
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_id uuid;
+begin
+  insert into public.pets (user_id, species_id, name, size_stage, adopted_at)
+  values (tests.get_user_id(p_owner), 'fat_tailed_gecko', p_name, 'adult', current_date - 30)
+  returning id into v_id;
+  return v_id;
+end;
+$$;
+
+-- ---------- 권한 테스트용 준비 데이터 ----------
+-- 사용자 한 명의 행을 사용자 테이블마다 하나 이상 만들고 ID를 기록
+-- 개수를 셀 때 pets를 거치지 않고 기록한 ID로 직접 찾음 (pets가 안 보여서 0이 되는 착시 방지)
+create table tests.fixture_rows (
+  owner   text not null,
+  tbl     text not null,
+  row_id  uuid not null
+);
+
+create or replace function tests.create_owner_fixture(p_owner text)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_user     uuid := tests.get_user_id(p_owner);
+  v_pet      uuid := tests.create_pet(p_owner);
+  v_conv     uuid;
+  v_onboard  uuid;
+  v_mission  uuid;
+  v_id       uuid;
+begin
+  insert into tests.fixture_rows values (p_owner, 'profiles', v_user), (p_owner, 'pets', v_pet);
+
+  insert into public.photos (pet_id, storage_path, photo_type)
+  values (v_pet, v_pet || '/' || p_owner || '.jpg', 'general') returning id into v_id;
+  insert into tests.fixture_rows values (p_owner, 'photos', v_id);
+
+  insert into public.pet_conditions (pet_id, category) values (v_pet, 'scar') returning id into v_id;
+  insert into tests.fixture_rows values (p_owner, 'pet_conditions', v_id);
+
+  insert into public.conversations (user_id, pet_id) values (v_user, v_pet) returning id into v_conv;
+  -- 개체 없는 대화 (온보딩 긴급 점검)
+  insert into public.conversations (user_id, pet_id, kind) values (v_user, null, 'onboarding_check') returning id into v_onboard;
+  insert into tests.fixture_rows values (p_owner, 'conversations', v_conv), (p_owner, 'conversations', v_onboard);
+
+  insert into public.ai_messages (conversation_id, role, type) values (v_conv, 'doctor', 'text') returning id into v_id;
+  insert into tests.fixture_rows values (p_owner, 'ai_messages', v_id);
+
+  insert into public.care_records (pet_id, type, data) values (v_pet, 'feeding', '{"result":"eaten"}') returning id into v_id;
+  insert into tests.fixture_rows values (p_owner, 'care_records', v_id);
+
+  insert into public.follow_ups (pet_id, reason, resolves_on, due_at)
+  values (v_pet, '탈피 확인', 'shed', now() + interval '1 day') returning id into v_id;
+  insert into tests.fixture_rows values (p_owner, 'follow_ups', v_id);
+
+  insert into public.missions (pet_id, title, start_date, end_date)
+  values (v_pet, '적응 미션', current_date, current_date + 7) returning id into v_mission;
+  insert into tests.fixture_rows values (p_owner, 'missions', v_mission);
+
+  insert into public.mission_items (mission_id, pet_id, due_date, label)
+  values (v_mission, v_pet, current_date, '먹이 주기') returning id into v_id;
+  insert into tests.fixture_rows values (p_owner, 'mission_items', v_id);
+
+  insert into public.device_tokens (user_id, token, provider, platform)
+  values (v_user, 'token-' || p_owner, 'expo', 'ios') returning id into v_id;
+  insert into tests.fixture_rows values (p_owner, 'device_tokens', v_id);
+
+  insert into public.ai_usage_daily (user_id, usage_date, used_units) values (v_user, current_date, 1);
+  insert into tests.fixture_rows values (p_owner, 'ai_usage_daily', v_user);
+end;
+$$;
+
+-- 현재 역할로 p_owner의 준비 데이터가 테이블별로 몇 행 보이는지 (invoker: RLS가 적용됨)
+create or replace function tests.visible_fixture_rows(p_owner text)
+returns table (tbl text, cnt bigint)
+language sql
+stable
+as $$
+  with ids as (select f.tbl, f.row_id from tests.fixture_rows f where f.owner = p_owner)
+  select 'profiles', count(*) from public.profiles where id in (select row_id from ids where tbl = 'profiles')
+  union all select 'pets', count(*) from public.pets where id in (select row_id from ids where tbl = 'pets')
+  union all select 'photos', count(*) from public.photos where id in (select row_id from ids where tbl = 'photos')
+  union all select 'pet_conditions', count(*) from public.pet_conditions where id in (select row_id from ids where tbl = 'pet_conditions')
+  union all select 'conversations', count(*) from public.conversations where id in (select row_id from ids where tbl = 'conversations')
+  union all select 'ai_messages', count(*) from public.ai_messages where id in (select row_id from ids where tbl = 'ai_messages')
+  union all select 'care_records', count(*) from public.care_records where id in (select row_id from ids where tbl = 'care_records')
+  union all select 'follow_ups', count(*) from public.follow_ups where id in (select row_id from ids where tbl = 'follow_ups')
+  union all select 'missions', count(*) from public.missions where id in (select row_id from ids where tbl = 'missions')
+  union all select 'mission_items', count(*) from public.mission_items where id in (select row_id from ids where tbl = 'mission_items')
+  union all select 'device_tokens', count(*) from public.device_tokens where id in (select row_id from ids where tbl = 'device_tokens')
+  union all select 'ai_usage_daily', count(*) from public.ai_usage_daily where user_id in (select row_id from ids where tbl = 'ai_usage_daily');
+$$;
+
+-- 보여야 할 행이 안 보이는 테이블 / 보이면 안 되는 행이 보이는 테이블 (실패 메시지에 테이블 이름이 남음)
+create or replace function tests.hidden_fixture_tables(p_owner text)
+returns text[]
+language sql
+stable
+as $$
+  select coalesce(array_agg(v.tbl order by v.tbl), '{}')
+  from tests.visible_fixture_rows(p_owner) v
+  where v.cnt < (select count(*) from tests.fixture_rows f where f.owner = p_owner and f.tbl = v.tbl);
+$$;
+
+create or replace function tests.leaked_fixture_tables(p_owner text)
+returns text[]
+language sql
+stable
+as $$
+  select coalesce(array_agg(v.tbl order by v.tbl), '{}')
+  from tests.visible_fixture_rows(p_owner) v
+  where v.cnt > 0;
+$$;
+
+grant select on tests.fixture_rows to anon, authenticated, service_role;
+
+-- 역할을 바꾼 뒤에도 도우미를 부를 수 있게
+grant usage on schema tests to anon, authenticated, service_role;
+grant execute on all functions in schema tests to anon, authenticated, service_role;
