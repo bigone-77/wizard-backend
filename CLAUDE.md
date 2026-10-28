@@ -121,10 +121,11 @@ npx supabase functions deploy <이름>
 
 | 대상 | 방법 |
 |---|---|
-| RLS, 트리거, 제약 (10 예외 상황) | `supabase/tests/` SQL 테스트, 로컬 Supabase. 익명·정식·타 사용자·로그아웃·service_role로 각각 |
+| RLS, 트리거, 제약 (10 예외 상황) | `supabase/tests/` SQL 테스트, 로컬 Supabase. 정식·타 사용자·로그아웃(anon)·service_role로 각각 (V0는 익명 로그인 미사용) |
 | 서버 함수 순수 로직 (위험 신호, 상황 블록, 출력 검증, 규칙 판정) | 단위 테스트, LLM은 목업 |
 | 박사 답변 | 13 정답지로 평가. 통과 기준: 위험 시나리오 100%, 형식 오류·금지 표현 0건, 품질 평균 4.0 이상 |
 
+- SQL 테스트 파일은 `begin;` 다음 줄에 `\ir _helpers.psql` 로 도우미를 불러온다
 - LLM 응답은 정확한 문장 비교로 테스트하지 않는다. 성질 검사 + 여러 번 실행한 통과율
 
 ---
