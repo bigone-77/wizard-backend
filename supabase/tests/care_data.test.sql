@@ -1,6 +1,6 @@
 -- 기록 data 검증 (16.3 형식 약속, 10 예외 상황: 필수값 누락·숫자 자리에 글자 → 저장 거부)
 begin;
-create extension if not exists pgtap with schema extensions;
+\ir _helpers.psql
 select plan(38);
 
 -- ---------- feeding ----------
@@ -62,34 +62,29 @@ select ok(not private.is_valid_care_data('observation', '{"key":"hide","value":t
 select ok(not private.is_valid_care_data('vomit', '{}'), '모르는 type → 거부');
 
 -- ---------- 실제 저장: 사용자 권한으로 check 제약이 동작 (규칙 7) ----------
-insert into auth.users (id, email, aud, role) values
-  ('00000000-0000-0000-0000-00000000000c', 'c@test.local', 'authenticated', 'authenticated');
-
-set local role authenticated;
-select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-00000000000c","role":"authenticated"}', true);
-
-insert into public.pets (id, species_id, name, size_stage, adopted_at)
-values ('00000000-0000-0000-0000-0000000000c1', 'fat_tailed_gecko', '기록이', 'adult', current_date - 3);
+select tests.create_user('c');
+select tests.create_pet('c', '기록이');
+select tests.authenticate_as('c');
 
 select lives_ok(
   $$ insert into public.care_records (pet_id, type, data)
-     values ('00000000-0000-0000-0000-0000000000c1', 'feeding', '{"result":"eaten","quantity":3,"dusting":"calcium"}') $$,
+     values ((select id from public.pets limit 1), 'feeding', '{"result":"eaten","quantity":3,"dusting":"calcium"}') $$,
   '사용자: 올바른 먹이 기록 저장'
 );
 select lives_ok(
   $$ insert into public.care_records (pet_id, type, data)
-     values ('00000000-0000-0000-0000-0000000000c1', 'defecation', '{"status":"soft","abnormal":["mucus"]}') $$,
+     values ((select id from public.pets limit 1), 'defecation', '{"status":"soft","abnormal":["mucus"]}') $$,
   '사용자: 올바른 배변 기록 저장'
 );
 select throws_ok(
   $$ insert into public.care_records (pet_id, type, data)
-     values ('00000000-0000-0000-0000-0000000000c1', 'feeding', '{"quantity":3}') $$,
+     values ((select id from public.pets limit 1), 'feeding', '{"quantity":3}') $$,
   '23514', null,
   '사용자: 필수값 누락 기록 → 저장 거부'
 );
 select throws_ok(
   $$ insert into public.care_records (pet_id, type, data)
-     values ('00000000-0000-0000-0000-0000000000c1', 'weight', '{"weight_g":"열아홉"}') $$,
+     values ((select id from public.pets limit 1), 'weight', '{"weight_g":"열아홉"}') $$,
   '23514', null,
   '사용자: 숫자 자리에 글자 → 저장 거부'
 );

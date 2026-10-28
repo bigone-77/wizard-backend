@@ -1,13 +1,12 @@
 -- 개체 수 상한 (10 예외 상황: 두 번째 개체 등록 차단)
 begin;
-create extension if not exists pgtap with schema extensions;
+\ir _helpers.psql
 select plan(8);
 
 -- 익명 로그인 미사용 → 정리 함수 없음
 select hasnt_function('public', 'list_stale_anonymous_users', 'list_stale_anonymous_users 제거');
 
-insert into auth.users (id, email, aud, role) values
-  ('00000000-0000-0000-0000-00000000000a', 'a@test.local', 'authenticated', 'authenticated');
+select tests.create_user('a');
 
 select is(
   (select value from public.app_config where key = 'max_pets_per_user'),
@@ -15,8 +14,7 @@ select is(
   'app_config.max_pets_per_user = 1'
 );
 
-set local role authenticated;
-select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-00000000000a","role":"authenticated"}', true);
+select tests.authenticate_as('a');
 
 select lives_ok(
   $$ insert into public.pets (id, species_id, name, size_stage, adopted_at)
@@ -54,7 +52,7 @@ select lives_ok(
 -- 값만 바꾸면 여러 마리
 reset role;
 update public.app_config set value = '2' where key = 'max_pets_per_user';
-set local role authenticated;
+select tests.authenticate_as('a');
 
 select lives_ok(
   $$ insert into public.pets (species_id, name, size_stage, adopted_at)
