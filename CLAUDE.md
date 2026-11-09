@@ -1,4 +1,4 @@
-# CLAUDE.md — wizard-backend
+# CLAUDE.md: wizard-backend
 
 펫테일 게코 케어 앱의 Supabase 백엔드 저장소 (DB 마이그레이션, 서버 함수, 설정).
 **"입양 준비부터 아픈 날까지, 내 도마뱀을 기억하는 친구 같은 박사"**
@@ -138,6 +138,16 @@ npx supabase functions deploy <이름>
 
 ---
 
+## 문체 (설명, 커밋, PR, 문서)
+
+- **줄표(—, –)를 쓰지 않는다.** 콜론, 괄호, 문장 분리로 대체
+- 결론을 먼저 말하고, 목록과 표를 적극적으로 쓴다
+- 사용자가 모를 수 있는 개념은 풀어서 설명하고, **왜 그렇게 하는지**를 함께 말한다
+- 단계마다 직접 실행해볼 **확인 방법**(명령, 기대 결과)을 준다
+- 확인한 것과 추측을 구분한다
+
+---
+
 ## 커밋
 
 형식: `{이모지} {타입}: {요약}` + 필요하면 본문
@@ -170,6 +180,42 @@ npx supabase functions deploy <이름>
 
 ---
 
+## PR과 합치기
+
+`feature/*`에서 `dev`로는 **Squash and merge**라서 `dev` 기록에는 **PR 제목 한 줄**만 남는다.
+
+**제목**: `{이모지} {타입}: {요약} (T번호)`
+예: `✨ Feat: V0 반영 마이그레이션 (T004)`
+
+**본문**
+
+```markdown
+Closes #이슈번호
+
+## 무엇을 했나
+
+-
+
+## 결정
+
+- (계획 중 정한 것과 이유)
+
+## 확인 결과
+
+- (실행한 명령과 결과, 통과한 SQL 테스트)
+
+## 다루지 않은 것
+
+- (넘긴 일과 넘긴 할 일 ID)
+```
+
+- **`Closes #번호`는 반드시 첫 줄에.** 이게 있어야 `dev`(기본 브랜치)에 합칠 때 이슈가 닫힌다
+- 마이그레이션을 바꿨으면 본문에 **`wizard-app`에서 DB 타입 재생성이 필요하다**는 것을 적는다 (Squash라서 커밋 본문은 `dev`에 남지 않는다)
+- 합치기 전에 사용자가 검토한다. Claude Code는 PR을 만들되 **합치지 않는다**
+- release, hotfix를 `main`에 합칠 때는 **Merge commit**
+
+---
+
 ## 브랜치
 
 ```text
@@ -181,14 +227,14 @@ hotfix/*  (최신 release = main에서 출발) → main → release/v0.x.(y+1) �
 |---|---|---|
 | `feature/*` | 기능 개발. `dev`에서 만들고 PR로 `dev`에 합침 | 로컬 (Docker) |
 | `dev` | **검증하는 곳.** 기능이 모이고 테스트 환경에서 확인 | 테스트 (dev 프로젝트, 내부 테스트 빌드) |
-| `release/v0.x.y` | **버전 기록.** 검증이 끝난 `dev`를 버전 이름으로 잘라냄. 만들자마자 `main`에 합침 | — |
+| `release/v0.x.y` | **버전 기록.** 검증이 끝난 `dev`를 버전 이름으로 잘라냄. 만들자마자 `main`에 합침 | 없음 |
 | `main` | **운영.** 항상 최신 release와 같음. 합칠 때마다 버전 태그 | 운영 (알파 프로젝트, TestFlight · Play 내부 테스트) |
-| `hotfix/*` | 운영 긴급 수정 | — |
+| `hotfix/*` | 운영 긴급 수정 | 없음 |
 
 ### 규칙
 - **"최신 release = main"을 항상 유지한다**
-- `main`, `release/*`에는 직접 커밋하지 않는다. **release에서 작업하지 않는다** — 고칠 게 생기면 `dev`에서 고치고 새 release를 자른다
-- 브랜치 이름: `{종류}/{마일스톤}-{내용}` — 예: `feature/m1-auth`, `feature/m3-records`, `hotfix/record-retry`
+- `main`, `release/*`에는 직접 커밋하지 않는다. **release에서 작업하지 않는다.** 고칠 게 생기면 `dev`에서 고치고 새 release를 자른다
+- 브랜치 이름: `{종류}/{마일스톤}-{내용}` (예: `feature/m1-auth`, `feature/m3-records`, `hotfix/record-retry`)
 - 두 저장소를 함께 바꿀 때: 양쪽에 같은 이름의 브랜치, 합치는 순서는 `wizard-backend` → `wizard-app`
 
 ### 배포 (release → main)
@@ -218,3 +264,4 @@ hotfix/*  (최신 release = main에서 출발) → main → release/v0.x.(y+1) �
 - `main`에 합칠 때만 → 운영 프로젝트에 `db push`. 운영 DB는 다른 경로로 바꾸지 않는다
 - hotfix에서 마이그레이션을 만들면 `main`과 `dev` 양쪽 프로젝트에 모두 적용해 두 환경이 어긋나지 않게 한다
 - 합치기 전에 대상 브랜치를 받아서 마이그레이션 파일 순서(타임스탬프)가 꼬이지 않았는지 확인
+- **원격 DB(dev, 운영)의 `db push`와 `db reset --linked`는 사용자가 직접 실행한다.** Claude Code는 `.claude/settings.json`의 deny로 막혀 있다. 로컬 `db reset`은 허용

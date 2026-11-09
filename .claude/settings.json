@@ -10,6 +10,26 @@
       "Bash(git log:*)",
       "Bash(git branch:*)",
       "Bash(git diff:*)"
+    ],
+    "deny": [
+      "Edit(../wizard-app-planning/**)",
+      "Write(../wizard-app-planning/**)",
+      "Edit(../wizard-app/**)",
+      "Write(../wizard-app/**)",
+      "Read(./.env)",
+      "Read(./.env.*)",
+      "Read(./supabase/.env)",
+      "Read(./supabase/.env.*)",
+      "Read(./supabase/functions/.env)",
+      "Read(./supabase/functions/.env.*)",
+      "Bash(git push --force:*)",
+      "Bash(git push -f:*)",
+      "Bash(git reset --hard:*)",
+      "Bash(rm -rf:*)",
+      "Bash(npx supabase db push:*)",
+      "Bash(supabase db push:*)",
+      "Bash(npx supabase db reset --linked:*)",
+      "Bash(supabase db reset --linked:*)"
     ]
   }
 }

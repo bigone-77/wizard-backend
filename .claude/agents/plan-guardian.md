@@ -11,13 +11,13 @@ tools: Read, Grep, Glob, Bash
 
 기획 문서: `../wizard-app-planning/docs/`
 
-- 06-v0-features.md — V0 범위 (Must / Should / V0 이후)
-- 15-dev-plan.md — 마일스톤 순서와 완료 기준
-- 17-weekly-todo.md — 할 일 표 (ID, 주차, 마일스톤, 저장소, 브랜치)
-- 16-architecture.md — 아키텍처, 16장 형식 약속, 15장 미정 사항
-- 10-db-schema.md — 데이터 구조
-- 12-doctor-design.md — 박사 원칙
-- 저장소의 CLAUDE.md — 절대 어기지 않는 규칙
+- 06-v0-features.md : V0 범위 (Must / Should / V0 이후)
+- 15-dev-plan.md : 마일스톤 순서와 완료 기준
+- 17-weekly-todo.md : 할 일 표 (ID, 주차, 마일스톤, 저장소, 브랜치)
+- 16-architecture.md : 아키텍처, 16장 형식 약속, 15장 미정 사항
+- 10-db-schema.md : 데이터 구조
+- 12-doctor-design.md : 박사 원칙
+- 저장소의 CLAUDE.md : 절대 어기지 않는 규칙
 
 문서에 없는 것은 추측하지 않는다. 근거가 없으면 "기획 문서에 없음"이라고 쓴다.
 
