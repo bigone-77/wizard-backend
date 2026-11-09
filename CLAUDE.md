@@ -264,3 +264,4 @@ hotfix/*  (최신 release = main에서 출발) → main → release/v0.x.(y+1) �
 - `main`에 합칠 때만 → 운영 프로젝트에 `db push`. 운영 DB는 다른 경로로 바꾸지 않는다
 - hotfix에서 마이그레이션을 만들면 `main`과 `dev` 양쪽 프로젝트에 모두 적용해 두 환경이 어긋나지 않게 한다
 - 합치기 전에 대상 브랜치를 받아서 마이그레이션 파일 순서(타임스탬프)가 꼬이지 않았는지 확인
+- **원격 DB(dev, 운영)의 `db push`와 `db reset --linked`는 사용자가 직접 실행한다.** Claude Code는 `.claude/settings.json`의 deny로 막혀 있다. 로컬 `db reset`은 허용
