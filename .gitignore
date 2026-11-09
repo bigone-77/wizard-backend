@@ -1,0 +1,32 @@
+# macOS
+.DS_Store
+
+# env files (예시 파일만 커밋)
+# 서버 함수 secrets(LLM_API_KEY 등)는 저장소에 넣지 않는다 (CLAUDE.md 규칙 12)
+.env
+.env.*
+!.env.example
+
+# 키, 인증서
+*.pem
+*.key
+
+# dependencies
+node_modules/
+
+# logs
+*.log
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# editors
+# .vscode는 공유 설정(settings.json, extensions.json)만 커밋한다
+# 폴더(.vscode/)가 아니라 안의 파일(.vscode/*)을 무시해야 ! 예외가 동작한다
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+.idea/
+
+# Claude Code 개인 설정 (공유 설정 .claude/settings.json은 커밋)
+.claude/settings.local.json
