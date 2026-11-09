@@ -1,4 +1,4 @@
-# CLAUDE.md — wizard-backend
+# CLAUDE.md: wizard-backend
 
 펫테일 게코 케어 앱의 Supabase 백엔드 저장소 (DB 마이그레이션, 서버 함수, 설정).
 **"입양 준비부터 아픈 날까지, 내 도마뱀을 기억하는 친구 같은 박사"**
@@ -181,14 +181,14 @@ hotfix/*  (최신 release = main에서 출발) → main → release/v0.x.(y+1) �
 |---|---|---|
 | `feature/*` | 기능 개발. `dev`에서 만들고 PR로 `dev`에 합침 | 로컬 (Docker) |
 | `dev` | **검증하는 곳.** 기능이 모이고 테스트 환경에서 확인 | 테스트 (dev 프로젝트, 내부 테스트 빌드) |
-| `release/v0.x.y` | **버전 기록.** 검증이 끝난 `dev`를 버전 이름으로 잘라냄. 만들자마자 `main`에 합침 | — |
+| `release/v0.x.y` | **버전 기록.** 검증이 끝난 `dev`를 버전 이름으로 잘라냄. 만들자마자 `main`에 합침 | 없음 |
 | `main` | **운영.** 항상 최신 release와 같음. 합칠 때마다 버전 태그 | 운영 (알파 프로젝트, TestFlight · Play 내부 테스트) |
-| `hotfix/*` | 운영 긴급 수정 | — |
+| `hotfix/*` | 운영 긴급 수정 | 없음 |
 
 ### 규칙
 - **"최신 release = main"을 항상 유지한다**
-- `main`, `release/*`에는 직접 커밋하지 않는다. **release에서 작업하지 않는다** — 고칠 게 생기면 `dev`에서 고치고 새 release를 자른다
-- 브랜치 이름: `{종류}/{마일스톤}-{내용}` — 예: `feature/m1-auth`, `feature/m3-records`, `hotfix/record-retry`
+- `main`, `release/*`에는 직접 커밋하지 않는다. **release에서 작업하지 않는다.** 고칠 게 생기면 `dev`에서 고치고 새 release를 자른다
+- 브랜치 이름: `{종류}/{마일스톤}-{내용}` (예: `feature/m1-auth`, `feature/m3-records`, `hotfix/record-retry`)
 - 두 저장소를 함께 바꿀 때: 양쪽에 같은 이름의 브랜치, 합치는 순서는 `wizard-backend` → `wizard-app`
 
 ### 배포 (release → main)
